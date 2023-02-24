@@ -73,6 +73,8 @@ for provisioning PVs. This field must be specified.
 | FlexVolume           |          -           |                   -                   |
 | GCEPersistentDisk    |       &#x2713;       |           [GCE PD](#gce-pd)           |
 | iSCSI                |          -           |                   -                   |
+| OCIBlockVolume       |          -           |  [OCI Blockvolume](#ociblockvolume)   |
+| OCIFileStorage       |          -           |          [OCI FFS](#ocifilestorage)    |
 | NFS                  |          -           |              [NFS](#nfs)              |
 | RBD                  |       &#x2713;       |         [Ceph RBD](#ceph-rbd)         |
 | VsphereVolume        |       &#x2713;       |          [vSphere](#vsphere)          |
@@ -334,6 +336,59 @@ using `allowedTopologies`.
 `zone` and `zones` parameters are deprecated and replaced with
 [allowedTopologies](#allowed-topologies)
 {{< /note >}}
+
+### OCIBlockVolume
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: <storage-class-name>
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  attachment-type: "paravirtualized|iscsi"
+  kms-key-id: <key-ocid>
+  vpusPerGB: "0|10|20"
+  csi.storage.k8s.io/fstype: "ext3|ext4|xfs"
+```
+
+- `attachment-type`: How the block volume is attached to the compute instance
+- `kms-key-id`: The master encryption key to use. You can specify the OCID of a master encryption key in the Vault service.
+- `allowVolumeExpansion`: To create a PVC backed by a block volume with a **Lower Cost**(`10`), **Balanced**(`10`), or **Higher Performance**(`20`) performance level. Default: `10`
+- `csi.storage.k8s.io/fstype`: To create a PVC backed by a block volume with an ext3, XFS or ext4 file system, set the fstype parameter in the custom storage class definition. Default: `ext4`.
+
+See the [Oracle BlockVolume documentation](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_BV.htm#Provisioning_Persistent_Volume_Claims_on_the_Block_Volume_Service) for more details on the available parameters.
+
+### OCIFileStorage
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: <storage-class-name>
+provisioner: fss.csi.oraclecloud.com
+parameters:
+  availabilityDomain: <ad-name>
+  mountTargetOcid: <mt-ocid> | mountTargetSubnetOcid: <mt-subnet-ocid>
+  compartmentOcid: <compartment-ocid>
+  kmsKeyOcid: <key-ocid>
+  exportPath: <path>
+  exportOptions: [{<options-in-json-format>}]
+  encryptInTransit: "true"|"false"
+```
+
+- `availabilityDomain`: Required. The name of the availability domain in which to create the new file system (and in which to create the new mount target, if an existing mount target OCID is not specified). 
+- `mountTargetOcid` | `mountTargetSubnetOcid`: Required. Either the OCID of an existing active mount target (mountTargetOcid: <mt-ocid>), or the OCID of a subnet in which to create a new mount target (mountTargetSubnetOcid: <mt-subnet-ocid>). Specify either mountTargetOcid or mountTargetSubnetOcid. If you specify both mountTargetOcid and mountTargetSubnetOcid in the storage class definition, the existing mount target specified by mountTargetOcid is used, and mountTargetSubnetOcid is ignored.
+- `compartmentOcid`: Optional. The OCID of the compartment to which the new file system (and the new mount target, if an existing mount target OCID is not specified) is to belong. If not specified, defaults to the same compartment as the cluster.
+- `kmsKeyOcid`: Optional. The OCID of a master encryption key that you manage, with which to encrypt data at rest. If not specified, data is encrypted at rest using encryption keys managed by Oracle.
+- `exportPath`: Optional. The path in an export that uniquely identifies the file system within the mount target. The export path must start with a slash (/) followed by a sequence of zero or more slash-separated elements. For more information, see [Paths in File Systems](https://docs.oracle.com/en-us/iaas/Content/File/Concepts/filesystempaths.htm#Paths_in_File_Systems).
+- `exportOptions`: Optional. A set of parameters (in valid JSON format) within the export that specifies the level of access granted to NFS clients when they connect to a mount target. An NFS export options entry within an export defines access for a single IP address or CIDR block range. For more information, see [Working with NFS Export Options](https://docs.oracle.com/en-us/iaas/Content/File/Tasks/exportoptions2.htm#Working_with_NFS_Export_Options). If not specified, the following default is used:
+  ```json
+  exportOptions: [ { "source" : "0.0.0.0/0", "requirePrivilegedSourcePort" : false, "access" : "READ_WRITE", "identitySquash" : "NONE" } ]
+  ```
+- `encryptInTransit`: Optional. Indicates whether to encrypt data in transit. If you specify "true", be sure to complete the setup steps described in [Encrypting Data In Transit on a New File System](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_Provisioning_PVCs_on_FSS.htm#contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_new-FSS-Encrypting_in_transit). Default: `"false"`
+
+See the [Oracle FSS documentation](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_Provisioning_PVCs_on_FSS.htm#contengcreatingpersistentvolumeclaim_topic-Provisioning_PVCs_on_FSS-Using-CSI-Volume-Plugin) for more details on the available parameters.
 
 ### NFS
 
